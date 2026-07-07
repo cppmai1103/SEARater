@@ -44,16 +44,18 @@ def trainable_parameters(model):
     return (p for p in model.parameters() if p.requires_grad)
 
 
-def pack_texts(texts, tokenizer, seq_length):
+def pack_texts(texts, tokenizer, seq_length, desc="packing"):
     """Concatenate tokenized documents (EOS-separated) into a stream, then
     chunk into fixed-length blocks of `seq_length` tokens, dropping the
     final incomplete block -- the standard packed-pretraining approach.
 
     Returns a tensor of shape (num_blocks, seq_length).
     """
+    from tqdm.auto import tqdm
+
     eos_id = tokenizer.eos_token_id
     all_ids = []
-    for text in texts:
+    for text in tqdm(texts, desc=desc, unit="doc"):
         ids = tokenizer(text, add_special_tokens=False)["input_ids"]
         all_ids.extend(ids)
         all_ids.append(eos_id)
@@ -73,11 +75,14 @@ def make_block_loader(blocks, batch_size, shuffle):
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def train_one_epoch(model, loader, optimizer, device):
+def train_one_epoch(model, loader, optimizer, device, desc="train"):
+    from tqdm.auto import tqdm
+
     model.train()
     total_loss = 0.0
     total_batches = 0
-    for (batch,) in loader:
+    progress = tqdm(loader, desc=desc, unit="batch")
+    for (batch,) in progress:
         batch = batch.to(device)
         optimizer.zero_grad()
         outputs = model(input_ids=batch, labels=batch)
@@ -86,17 +91,22 @@ def train_one_epoch(model, loader, optimizer, device):
         optimizer.step()
         total_loss += loss.item()
         total_batches += 1
+        progress.set_postfix(loss=f"{total_loss / total_batches:.4f}")
     return total_loss / max(total_batches, 1)
 
 
 @torch.no_grad()
-def evaluate_loss(model, loader, device):
+def evaluate_loss(model, loader, device, desc="eval"):
+    from tqdm.auto import tqdm
+
     model.eval()
     total_loss = 0.0
     total_batches = 0
-    for (batch,) in loader:
+    progress = tqdm(loader, desc=desc, unit="batch")
+    for (batch,) in progress:
         batch = batch.to(device)
         outputs = model(input_ids=batch, labels=batch)
         total_loss += outputs.loss.item()
         total_batches += 1
+        progress.set_postfix(loss=f"{total_loss / total_batches:.4f}")
     return total_loss / max(total_batches, 1)

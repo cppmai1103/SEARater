@@ -174,5 +174,115 @@
       "cleanliness": 0.15,
       "cultural_nuance": 0.1
     }
+  },
+  {
+    "id": "W17",
+    "meaning": "Reasoning + cleanliness",
+    "weights": {
+      "educational_value": 0.15,
+      "reasoning": 0.35,
+      "professionalism": 0.1,
+      "cleanliness": 0.3,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W18",
+    "meaning": "Reasoning + cultural",
+    "weights": {
+      "educational_value": 0.15,
+      "reasoning": 0.35,
+      "professionalism": 0.1,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.3
+    }
+  },
+  {
+    "id": "W19",
+    "meaning": "Professionalism + cleanliness",
+    "weights": {
+      "educational_value": 0.15,
+      "reasoning": 0.1,
+      "professionalism": 0.35,
+      "cleanliness": 0.3,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W20",
+    "meaning": "Professionalism + cultural",
+    "weights": {
+      "educational_value": 0.15,
+      "reasoning": 0.1,
+      "professionalism": 0.35,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.3
+    }
+  },
+  {
+    "id": "W21",
+    "meaning": "Cleanliness + cultural",
+    "weights": {
+      "educational_value": 0.15,
+      "reasoning": 0.1,
+      "professionalism": 0.1,
+      "cleanliness": 0.35,
+      "cultural_nuance": 0.3
+    }
+  },
+  {
+    "id": "W22",
+    "meaning": "Edu + reasoning + professionalism",
+    "weights": {
+      "educational_value": 0.3,
+      "reasoning": 0.25,
+      "professionalism": 0.25,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W23",
+    "meaning": "Edu + cleanliness + cultural",
+    "weights": {
+      "educational_value": 0.3,
+      "reasoning": 0.1,
+      "professionalism": 0.1,
+      "cleanliness": 0.25,
+      "cultural_nuance": 0.25
+    }
+  },
+  {
+    "id": "W24",
+    "meaning": "Reasoning + cleanliness + cultural",
+    "weights": {
+      "educational_value": 0.1,
+      "reasoning": 0.3,
+      "professionalism": 0.1,
+      "cleanliness": 0.25,
+      "cultural_nuance": 0.25
+    }
+  },
+  {
+    "id": "W25",
+    "meaning": "Edu + reasoning + cleanliness",
+    "weights": {
+      "educational_value": 0.3,
+      "reasoning": 0.25,
+      "professionalism": 0.1,
+      "cleanliness": 0.25,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W26",
+    "meaning": "Professionalism + cleanliness + cultural",
+    "weights": {
+      "educational_value": 0.1,
+      "reasoning": 0.1,
+      "professionalism": 0.3,
+      "cleanliness": 0.25,
+      "cultural_nuance": 0.25
+    }
   }
 ]

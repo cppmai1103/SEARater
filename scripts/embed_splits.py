@@ -41,9 +41,11 @@ def main():
     out_dir = DATA_DIR / "embeddings"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    print(f"loading encoder {args.model_name} ...")
     tokenizer, model = load_encoder(args.model_name, device=args.device)
 
     for split in SPLITS:
+        print(f"\n=== [{split}] embedding ===")
         rows = load_split(split)
         texts = [row["text"] for row in rows]
         embeddings = embed_texts(

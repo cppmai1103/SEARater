@@ -1,7 +1,7 @@
 """
 pipeline.md Section 9 - build the fixed proxy/final validation set.
 
-Streams a small, fixed held-out set per language (1M tokens/language, 4M
+Streams a small, fixed held-out set per language (1M tokens/language, 8M
 total) from the *same* FineWeb2 splits build_candidate_corpus.py draws
 from, but skipping past however many documents that script already
 consumed -- so this validation set never overlaps with candidate training
@@ -16,17 +16,16 @@ Usage:
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from datatrove.pipeline.readers import ParquetReader
+from tqdm.auto import tqdm
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from sea_rater.languages import LANGUAGE_HF_CONFIGS
 
 HF_DATASET = "HuggingFaceFW/fineweb-2"
-LANGUAGE_HF_CONFIGS = {
-    "vi": "vie_Latn",
-    "id": "ind_Latn",
-    "th": "tha_Thai",
-    "km": "khm_Khmr",
-}
 
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "validation_set"
 
@@ -47,9 +46,12 @@ def stream_docs_after_skip(hf_config, skip_n, token_target, source_label, chars_
     rows = []
     total_tokens = 0
     skipped = 0
+    skip_progress = tqdm(total=skip_n, desc=f"skipping already-consumed [{source_label}]", unit="doc")
+    token_progress = tqdm(total=token_target, desc=f"streaming {source_label} [{hf_config}]", unit="tok")
     for doc in reader():
         if skipped < skip_n:
             skipped += 1
+            skip_progress.update(1)
             continue
         text = (doc.text or "").strip()
         char_len = len(text)
@@ -61,9 +63,13 @@ def stream_docs_after_skip(hf_config, skip_n, token_target, source_label, chars_
                 "source": source_label,
             }
         )
-        total_tokens += char_len / chars_per_token
+        est_tokens = char_len / chars_per_token
+        total_tokens += est_tokens
+        token_progress.update(min(est_tokens, token_target - token_progress.n))
         if total_tokens >= token_target:
             break
+    skip_progress.close()
+    token_progress.close()
     if total_tokens < token_target:
         print(
             f"  warning: only found ~{total_tokens / 1e6:.2f}M tokens in {path} "
@@ -113,6 +119,7 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for lang in args.languages:
+        print(f"\n=== [{lang}] building validation set ===")
         hf_config = LANGUAGE_HF_CONFIGS[lang]
         rows = build_language_validation_set(
             lang, hf_config, args.tokens_per_language, args.clean_ratio, args.chars_per_token

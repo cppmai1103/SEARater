@@ -1,7 +1,7 @@
 """
 pipeline.md Section 3 - Human Annotation Data.
 
-Reads the human-labeled CSVs for the 4 pilot languages and splits each
+Reads the human-labeled CSVs for the 8 pilot languages and splits each
 language's 940 documents into train/dev/test/drop (720/90/90/40), using
 iterative stratification so the 0-5 score distribution of every one of the
 5 quality dimensions stays proportionally balanced across splits. Language
@@ -19,17 +19,21 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from sea_rater.languages import LANGUAGE_HF_CONFIGS
+
 csv.field_size_limit(sys.maxsize)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 OUTPUT_DIR = DATA_DIR / "splits"
 
-LANGUAGE_FILES = {
-    "vi": "/human_annotation/vie_Latn.csv",
-    "id": "/human_annotation/ind_Latn.csv",
-    "th": "/human_annotation/tha_Thai.csv",
-    "km": "/human_annotation/khm_Khmr.csv",
-}
+# CSV filenames match each language's FineWeb2 config name exactly (e.g.
+# data/human_annotation/vie_Latn.csv) -- no leading "/", since a joined path
+# segment starting with "/" makes Path.__truediv__ discard DATA_DIR entirely
+# and resolve to that absolute path instead (a real bug in an earlier
+# version of this dict: "/human_annotation/vie_Latn.csv" silently resolved
+# to a nonexistent /human_annotation/ at the filesystem root).
+LANGUAGE_FILES = {code: f"human_annotation/{hf_config}.csv" for code, hf_config in LANGUAGE_HF_CONFIGS.items()}
 
 DIMENSIONS = [
     "educational_value",
@@ -166,6 +170,7 @@ def main():
     splits = {"train": [], "dev": [], "test": []}
 
     for lang, filename in LANGUAGE_FILES.items():
+        print(f"[{lang}] loading + splitting {filename} ...")
         csv_path = DATA_DIR / filename
         rows = load_rows(csv_path, lang)
         assert len(rows) == sum(SPLIT_SIZES.values()), (

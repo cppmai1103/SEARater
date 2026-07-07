@@ -9,13 +9,13 @@ The pilot uses only:
 - A frozen rater backbone: **multilingual-e5-large**
 - A small proxy CPT model: **Qwen2.5-0.5B Base**
 - A final CPT model: **Qwen2.5-1.5B Base**
-- **16 candidate score-weight combinations**
+- **26 candidate score-weight combinations**
 - **No LightGBM / meta-regressor for now**
 - Continued pretraining only, no train-from-scratch final LM
 
 Main research question:
 
-> Can a human-only SEA-aware quality rater select better continued-pretraining data than random, clean heuristic, educational-value-only, or equal-average filtering?
+> Can a human-only SEA-aware quality rater select better continued-pretraining data than random, clean heuristic, or equal-average filtering?
 
 ---
 
@@ -23,20 +23,22 @@ Main research question:
 
 ### Languages
 
-Use **4 languages** for the first clean pilot:
+Use **8 languages** for the pilot:
 
 1. Vietnamese
 2. Indonesian
 3. Thai
 4. Khmer
+5. Malay
+6. Filipino
+7. Burmese
+8. Lao
 
 Rationale:
 
-- Vietnamese and Indonesian: Latin-script, relatively higher-resource
+- Vietnamese, Indonesian, Malay, Filipino: Latin-script, relatively higher-resource
 - Thai: non-segmented script
-- Khmer: lower-resource and more script/noise-sensitive
-
-After the pilot works, expand to 8 SEA languages.
+- Khmer, Burmese, Lao: lower-resource and more script/noise-sensitive, non-segmented scripts
 
 ---
 
@@ -50,10 +52,10 @@ You already have:
 940 annotated documents per language in /data/*.csv folder 
 ```
 
-For 4 pilot languages:
+For 8 pilot languages:
 
 ```text
-900 docs/language × 4 languages = 3,600 human-labeled documents
+900 docs/language × 8 languages = 7,200 human-labeled documents
 ```
 
 ### Dimensions
@@ -83,12 +85,12 @@ Use the existing 0-5 scale:
 
 Split each language separately:
 
-| Split | Documents per language | Total for 4 languages |
+| Split | Documents per language | Total for 8 languages |
 |---|---:|---:|
-| Train | 720 | 2,880 |
-| Dev | 90 | 360 |
-| Test | 90 | 360 |
-| Total | 900 | 3,600 |
+| Train | 720 | 5,760 |
+| Dev | 90 | 720 |
+| Test | 90 | 720 |
+| Total | 900 | 7,200 |
 
 The split should be stratified by:
 
@@ -252,10 +254,10 @@ For the clean pilot:
 100K candidate documents per language
 ```
 
-For 4 languages:
+For 8 languages:
 
 ```text
-400K candidate documents total
+800K candidate documents total
 ```
 
 ### Inputs
@@ -281,14 +283,18 @@ cleanliness_score
 cultural_nuance_score
 ```
 
-<!-- ### Cheap prefilter features
+### Cheap prefilter features
 
 Compute only simple cheap filters for the pilot:
 
 1. Language ID confidence (language_score attributes in the dataset)
 2. Document length in tokens (character_length)
-3. Repetition / boilerplate score 
-4. Script or encoding integrity, especially for Thai and Khmer -->
+3. Repetition (n-gram ratio repetation in a document)/ boilerplate score
+4. Target-script ratio: Percentage of characters belonging to the expected Unicode script.
+5. Ratio of stop words: Low-quality content doc will contain less stopwords 
+6. symbol ratio
+7. numeric-character ratio 
+8. Latin: ? 0/1   
 
 ### Output
 
@@ -296,7 +302,7 @@ Compute only simple cheap filters for the pilot:
 scored_corpus.jsonl
 ```
 
-<!-- Example row:
+Example row:
 
 ```json
 {
@@ -311,35 +317,37 @@ scored_corpus.jsonl
   "langid_conf": 0.98,
   "length_tokens": 612,
   "repetition_score": 0.08,
-  "script_integrity": 1
+  ....
 }
-``` -->
+```
 
 ---
 
-<!-- ## Basic Prefiltering (Not implement this for now)
+## 6. Basic Prefiltering
 
-Before learned selection, apply a simple safety prefilter.
-
-Recommended pilot thresholds:
+Applied to the candidate corpus itself (`build_candidate_corpus.py`), before
+any selection method runs, so every baseline (including random) starts from
+the same cleaned pool:
 
 ```text
-langid_conf >= 0.80
-100 <= length_tokens <= 4096
-repetition_score <= 0.20
-script_integrity == pass
+document contain hard badword -> hard-reject
+(same approach as data/human_annotation/pipeline_revise.ipynb: datatrove's
+banned_words.txt, tokenize + intersect)
 ```
 
-These thresholds can be tuned per language after inspecting score distributions.
+`language_score >= 0.80` and `repetition_score <= 0.20` are **not** applied
+here — those (and `target_script_ratio`) are cheap prefilter features
+(Section 5) computed and stored per document, but only used to filter
+inside Baseline 2 ("Clean-only heuristic") below, as a hard-filtering
+baseline to compare against the learned rater pipeline. Applying them to
+the candidate corpus itself would mean every baseline trains on
+already-heuristically-cleaned data, defeating that comparison.
 
 Purpose:
 
-- Remove obvious wrong-language documents
-- Remove extremely short or extremely long noisy documents
-- Remove repetitive boilerplate/spam
-- Remove encoding/script corruption
+- Remove documents containing hard bad words (adult content/profanity)
 
-This prefilter is applied before all selection methods, including random, to make comparisons fair. -->
+This prefilter is applied before all selection methods, including random, to make comparisons fair.
 
 ---
 
@@ -347,9 +355,10 @@ This prefilter is applied before all selection methods, including random, to mak
 
 
 
-<!-- ### Baseline 1: Random
+### Baseline 1: Random
 
-Randomly sample documents after the basic prefilter.
+Randomly sample documents from the candidate corpus (already bad-word
+filtered, see "Basic Prefiltering" above).
 
 Purpose:
 
@@ -359,15 +368,15 @@ Tests whether any quality-based filtering is better than random SEA continued pr
 
 ### Baseline 2: Clean-only heuristic
 
-Use only cheap filters and stricter cleanliness thresholds.
+Use only cheap filters and stricter cleanliness thresholds -- no length
+window, no rater score.
 
 Example:
 
 ```text
 langid_conf >= 0.90
-150 <= length_tokens <= 3072
 repetition_score <= 0.10
-script_integrity == pass
+script_integrity (target_script_ratio) >= 0.90
 ```
 
 Purpose:
@@ -376,21 +385,7 @@ Purpose:
 Tests whether cheap heuristic cleaning is already enough.
 ```
 
-### Baseline 3: Educational-value only
-
-Select top documents by:
-
-```text
-educational_value_score
-```
-
-Purpose:
-
-```text
-Tests whether the strongest single quality dimension is enough.
-```
-
-### Baseline 4: Equal-average rater
+### Baseline 3: Equal-average rater
 
 Select top documents by:
 
@@ -408,9 +403,12 @@ Purpose:
 
 ```text
 Tests whether simple equal weighting is enough.
-``` --> Not implement these baseline for now 
-
-### Baseline: model before continue pretraining
+``` --> Implemented as opt-in `--baseline {random,clean_heuristic,equal_average}`
+flags on build_final_cpt_dataset.py / run_final_cpt.py (see docs/08_final_cpt.md) --
+off by default, only best_weighted runs unless you uncomment them.
+(The "Educational-value only" baseline was removed -- W01 in Section 8's
+26-combination table already covers a pure edu-only weighted selection as
+part of the proxy CPT search.)
 
 ### Main method: Best weighted combination
 
@@ -442,9 +440,9 @@ Tests whether proxy-selected quality weighting improves CPT data selection.
 
 ---
 
-## 8. Generate 16 Candidate Weight Combinations
+## 8. Generate 26 Candidate Weight Combinations
 
-For the pilot, use **16 combinations** only.
+For the pilot, use **26 combinations** only.
 
 Include fixed interpretable weights:
 
@@ -466,6 +464,18 @@ Include fixed interpretable weights:
 | W14 | 0.30 | 0.15 | 0.15 | 0.30 | 0.10 | Edu + cleanliness |
 | W15 | 0.30 | 0.15 | 0.15 | 0.10 | 0.30 | Edu + cultural |
 | W16 | 0.20 | 0.30 | 0.25 | 0.15 | 0.10 | Reasoning + professionalism |
+| W17 | 0.15 | 0.35 | 0.10 | 0.30 | 0.10 | Reasoning + cleanliness |
+| W18 | 0.15 | 0.35 | 0.10 | 0.10 | 0.30 | Reasoning + cultural |
+| W19 | 0.15 | 0.10 | 0.35 | 0.30 | 0.10 | Professionalism + cleanliness |
+| W20 | 0.15 | 0.10 | 0.35 | 0.10 | 0.30 | Professionalism + cultural |
+| W21 | 0.15 | 0.10 | 0.10 | 0.35 | 0.30 | Cleanliness + cultural |
+| W22 | 0.30 | 0.25 | 0.25 | 0.10 | 0.10 | Edu + reasoning + professionalism |
+| W23 | 0.30 | 0.10 | 0.10 | 0.25 | 0.25 | Edu + cleanliness + cultural |
+| W24 | 0.10 | 0.30 | 0.10 | 0.25 | 0.25 | Reasoning + cleanliness + cultural |
+| W25 | 0.30 | 0.25 | 0.10 | 0.25 | 0.10 | Edu + reasoning + cleanliness |
+| W26 | 0.10 | 0.10 | 0.30 | 0.25 | 0.25 | Professionalism + cleanliness + cultural |
+
+W01-W16 have real proxy CPT results in `data/proxy_results.csv`, but from back when the pilot was 4 languages -- those rows (and their `best_weight.json` pick, W10) are now stale on two counts: wrong language count, and W17-W26 don't exist yet. All 26 combinations need a fresh proxy CPT run against the rebuilt 8-language validation set before `best_weight.json` reflects a real answer.
 
 No LightGBM is used in the pilot. The best weight is chosen directly from proxy CPT validation results.
 
@@ -489,17 +499,17 @@ Qwen2.5-0.5B Base
 - Same or highly compatible tokenizer behavior
 - Much cheaper than Qwen2.5-1.5B
 - Strong multilingual base
-- Practical for running 16 proxy experiments
+- Practical for running 26 proxy experiments
 
 ### Proxy data size
 
-For each of the 16 weight combinations:
+For each of the 26 weight combinations:
 
 ```text
-8M tokens total
+16M tokens total
 ```
 
-For 4 languages:
+For 8 languages:
 
 ```text
 2M tokens per language
@@ -508,7 +518,7 @@ For 4 languages:
 ### Proxy runs
 
 ```text
-16 weight combinations × 8M tokens each
+26 weight combinations × 16M tokens each
 ```
 
 Each run starts from the same checkpoint:
@@ -527,6 +537,9 @@ Qwen2.5-0.5B Base
 2. Continue-pretrain the proxy model
 - For each selected proxy dataset, start from the same pretrained checkpoint
 - Each run must start from the same base model so the comparison is fair.
+- Trained with LoRA (fresh adapter per run, base frozen) -- the same training
+  regime as the final Qwen2.5-1.5B CPT run (Section 12), so the proxy search
+  ranks weight combinations under the conditions they'll actually be used in.
 Note: For every proxy run, keep all training settings fixed. The only thing that changes is the selected data. 
 Keep the same across all proxy runs:
 
@@ -538,6 +551,7 @@ Keep the same across all proxy runs:
 - Batch size
 - Training steps
 - Validation set
+- LoRA configuration (r, alpha, dropout, target modules)
 
 Only change:
 
@@ -553,10 +567,10 @@ Create a fixed held-out validation set:
 1M tokens per language
 ```
 
-For 4 languages:
+For 8 languages:
 
 ```text
-4M validation tokens total
+8M validation tokens total
 ```
 
 This validation set must not overlap with candidate training data.
@@ -573,6 +587,10 @@ validation_loss_vietnamese
 validation_loss_indonesian
 validation_loss_thai
 validation_loss_khmer
+validation_loss_malay
+validation_loss_filipino
+validation_loss_burmese
+validation_loss_lao
 macro_validation_loss
 worst_language_validation_loss
 ```
@@ -580,13 +598,13 @@ worst_language_validation_loss
 Main proxy selection metric:
 
 ```text
-macro_loss = mean(loss_vi, loss_id, loss_th, loss_km)
+macro_loss = mean(loss_vi, loss_id, loss_th, loss_km, loss_ms, loss_tl, loss_my, loss_lo)
 ```
 
 Tie-breaker:
 
 ```text
-worst_language_loss = max(loss_vi, loss_id, loss_th, loss_km)
+worst_language_loss = max(loss_vi, loss_id, loss_th, loss_km, loss_ms, loss_tl, loss_my, loss_lo)
 ```
 
 ### Output
@@ -608,6 +626,10 @@ loss_vi
 loss_id
 loss_th
 loss_km
+loss_ms
+loss_tl
+loss_my
+loss_lo
 macro_loss
 worst_language_loss
 ```
@@ -641,10 +663,10 @@ best_weight.json
 For the pilot:
 
 ```text
-50M tokens total
+100M tokens total
 ```
 
-For 4 languages:
+For 8 languages:
 
 ```text
 12.5M tokens per language
@@ -652,35 +674,30 @@ For 4 languages:
 
 ### Final datasets
 
-<!-- Build 5 final CPT datasets:
+Build 4 final CPT datasets:
 
 1. Random
 2. Clean-only heuristic
-3. Educational-value only
-4. Equal-average rater
-5. Best weighted combination from proxy CPT -->
+3. Equal-average rater
+4. Best weighted combination from proxy CPT
 
-Build 2 final CPT datasets:
 
-1. Orginal model (no continue pretraining)
-2. Best weighted combination from proxy CPT
 
 Each dataset has exactly:
 
 ```text
-50M tokens total
+100M tokens total
 12.5M tokens per language
 ```
 
-<!-- ### Output -->
+### Output -->
 
-<!-- ```text
+```text
 D_random_1B
 D_clean_heuristic_1B
-D_edu_only_1B
 D_equal_average_1B
 D_best_weighted_1B
-``` -->
+```
 
 
 
@@ -702,24 +719,23 @@ No final train-from-scratch LM in the pilot.
 
 ### Final CPT runs
 
-<!-- Train 5 models:
+Train 4 models:
 
 ```text
 Qwen2.5-1.5B-CPT-Random
 Qwen2.5-1.5B-CPT-CleanHeuristic
-Qwen2.5-1.5B-CPT-EduOnly
 Qwen2.5-1.5B-CPT-EqualAverage
 Qwen2.5-1.5B-CPT-BestWeighted
-``` -->
+```
 
-Train a model: Qwen2.5-1.5B-CPT-BestWeighted with LoRa 
+Train a model: Qwen2.5-1.5B-CPT-BestWeighted with LoRA
 
 ### Control variables
 
 Keep the same across all final CPT runs:
 
 - Base checkpoint
-- Token budget: 50M tokens
+- Token budget: 100M tokens
 - Language balance: 12.5M tokens/language
 - Sequence length
 - Batch size
@@ -739,17 +755,11 @@ Selected CPT dataset
 
 Evaluate the following models:
 
-<!-- ```text
+```text
 Original Qwen2.5-1.5B Base
 Qwen2.5-1.5B-CPT-Random
 Qwen2.5-1.5B-CPT-CleanHeuristic
-Qwen2.5-1.5B-CPT-EduOnly
 Qwen2.5-1.5B-CPT-EqualAverage
-Qwen2.5-1.5B-CPT-BestWeighted
-``` -->
-
-```text
-Original Qwen2.5-1.5B Base
 Qwen2.5-1.5B-CPT-BestWeighted
 ```
 
@@ -759,7 +769,7 @@ Use the fixed validation set:
 
 ```text
 1M tokens per language
-4M tokens total
+8M tokens total
 ```
 
 Report:
@@ -779,7 +789,7 @@ Macro-average perplexity reduction
 ### 13.2 SEA downstream evaluation: lm-evaluation-harness
 
 Use 2 available SEA/multilingual benchmarks for the pilot.
-- topic classification: https://huggingface.co/datasets/Davlan/sib200 
+- topic classification: https://huggingface.co/datasets/Davlan/sib200
 - MCQ: https://huggingface.co/datasets/facebook/belebele
 
 Report:
@@ -789,7 +799,7 @@ Report:
 - Macro-average score
 - Worst-language score
 
-<!-- ### 13.3 Forgetting/general ability evaluation
+### 13.3 Forgetting/general ability evaluation
 
 Because this is continued pretraining, check whether general ability drops.
 
@@ -813,7 +823,7 @@ Goal:
 SEA performance improves while English/general performance does not collapse.
 ```
 
---- -->
+---
 
 ## 14. Main Pilot Claims
 
@@ -821,7 +831,7 @@ The pilot can support these claims if results are positive:
 
 1. A human-only multilingual quality rater trained from 900 annotated documents per language can produce useful quality scores for SEA data filtering.
 2. Proxy continued pretraining with Qwen2.5-0.5B can identify better quality-weight combinations.
-3. The best proxy-selected weighted data improves Qwen2.5-1.5B continued pretraining compared with random, clean heuristic, educational-value-only, and equal-average baselines.
+3. The best proxy-selected weighted data improves Qwen2.5-1.5B continued pretraining compared with random, clean heuristic, and equal-average baselines.
 4. Macro-language validation loss is a practical objective for multilingual SEA data selection.
 
 ---
@@ -834,7 +844,6 @@ The pilot does **not** include:
 - LightGBM meta-regressor
 - 128/256 weight combinations
 - Train-from-scratch final LM
-- Full 8-10 language setting
 - Full-scale 4B-10B token continued pretraining
 - Fine-tuning-heavy downstream evaluation
 
@@ -845,7 +854,7 @@ These can be added after the pilot is validated.
 ## 16. Clean Pilot Summary
 
 ```text
-1. Use 4 languages: Vietnamese, Indonesian, Thai, Khmer.
+1. Use 8 languages: Vietnamese, Indonesian, Thai, Khmer, Malay, Filipino, Burmese, Lao.
 2. Use 900 human-labeled documents per language.
 3. Split labels into 720 train, 90 dev, 90 test per language.
 4. Train human-only rater:
@@ -854,15 +863,14 @@ These can be added after the pilot is validated.
    - mean of 5 dimension losses
    - optimizer updates only heads
 5. Score 100K candidate docs per language.
-<!-- 6. Apply basic prefilters: LangID, length, repetition, script integrity. -->
-7. Create 16 candidate weighted combinations over 5 quality scores.
+6. Apply basic prefilters
+7. Create 26 candidate weighted combinations over 5 quality scores.
 8. Run proxy CPT with Qwen2.5-0.5B Base:
-   - 8M tokens per run
+   - 16M tokens per run
    - choose best weight by macro validation loss
-9. Build 5 final 50M-token CPT datasets:
+9. Build 4 final 100M-token CPT datasets:
    - Random
    - Clean heuristic
-   - Educational-value only
    - Equal average
    - Best weighted
 10. Continue pretrain Qwen2.5-1.5B Base on each final dataset.

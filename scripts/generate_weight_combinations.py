@@ -1,13 +1,25 @@
 """
-pipeline.md Section 8 - Generate 16 Candidate Weight Combinations.
+pipeline.md Section 8 - Generate 26 Candidate Weight Combinations.
 
-Materializes the pilot's fixed table of 16 interpretable weight vectors
+Materializes the pilot's fixed table of 26 interpretable weight vectors
 over the 5 rater dimensions into data/weight_combinations.json. No random
 sampling and no LightGBM here (pipeline.md is explicit: "No LightGBM is
 used in the pilot. The best weight is chosen directly from proxy CPT
 validation results.") -- this script just writes out the fixed table in a
 form scripts/select_weighted_corpus.py (Section 7) and the proxy CPT step
 (Section 9) can load.
+
+W01-W16 are unchanged from the pilot's original 16-combination table (real
+proxy CPT results already exist for these in data/proxy_results.csv).
+W17-W26 fill out the rest of the pairwise/triple design space pipeline.md's
+table left as "......." : the 5 dimension pairs W12-W16 didn't cover
+(W17-W21), and 5 three-dimension combinations (W22-W26). Since these are
+new, running the full 26-combination proxy search means re-running
+run_proxy_cpt.py for W17-W26 and re-deriving best_weight.json from all 26
+results before treating it as final. (The "*-very-heavy" single-dimension
+variants and the "Descending taper" combo were dropped -- W01-W05 already
+cover pure single-dimension weighting, so the very-heavy variants were
+redundant with those.)
 
 Usage:
     python3 scripts/generate_weight_combinations.py
@@ -41,6 +53,16 @@ WEIGHT_COMBINATIONS = [
     ("W14", 0.30, 0.15, 0.15, 0.30, 0.10, "Edu + cleanliness"),
     ("W15", 0.30, 0.15, 0.15, 0.10, 0.30, "Edu + cultural"),
     ("W16", 0.20, 0.30, 0.25, 0.15, 0.10, "Reasoning + professionalism"),
+    ("W17", 0.15, 0.35, 0.10, 0.30, 0.10, "Reasoning + cleanliness"),
+    ("W18", 0.15, 0.35, 0.10, 0.10, 0.30, "Reasoning + cultural"),
+    ("W19", 0.15, 0.10, 0.35, 0.30, 0.10, "Professionalism + cleanliness"),
+    ("W20", 0.15, 0.10, 0.35, 0.10, 0.30, "Professionalism + cultural"),
+    ("W21", 0.15, 0.10, 0.10, 0.35, 0.30, "Cleanliness + cultural"),
+    ("W22", 0.30, 0.25, 0.25, 0.10, 0.10, "Edu + reasoning + professionalism"),
+    ("W23", 0.30, 0.10, 0.10, 0.25, 0.25, "Edu + cleanliness + cultural"),
+    ("W24", 0.10, 0.30, 0.10, 0.25, 0.25, "Reasoning + cleanliness + cultural"),
+    ("W25", 0.30, 0.25, 0.10, 0.25, 0.10, "Edu + reasoning + cleanliness"),
+    ("W26", 0.10, 0.10, 0.30, 0.25, 0.25, "Professionalism + cleanliness + cultural"),
 ]
 
 

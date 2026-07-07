@@ -6,7 +6,7 @@ combination with the lowest macro validation loss. If multiple
 combinations land within --tie-tolerance of the best macro loss, the one
 with the better (lower) worst-language loss wins the tie. No LightGBM /
 regression here -- pipeline.md is explicit that the pilot picks directly
-from the 16 proxy CPT results.
+from the proxy CPT results (26 weight combinations).
 
 Usage:
     python3 scripts/select_best_weight.py

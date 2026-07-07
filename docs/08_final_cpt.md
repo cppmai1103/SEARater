@@ -11,11 +11,18 @@ Datasets") and Section 12 ("Final Continued Pretraining")
 Take the single winning weight combination from Section 10
 (`data/best_weight.json`) and actually build the real, full-scale model:
 LoRA continue-pretrain Qwen2.5-1.5B Base into
-`Qwen2.5-1.5B-CPT-BestWeighted` on 50M tokens (12.5M/language) selected by
+`Qwen2.5-1.5B-CPT-BestWeighted` on 100M tokens (12.5M/language) selected by
 that weight vector.
 
 The pilot's other final "dataset" — the untouched original Qwen2.5-1.5B
 Base — needs no data and no training; it's evaluated as-is in Step 13.
+
+Both scripts also take `--baseline {random,clean_heuristic,equal_average,best_weighted}`
+(default `best_weighted`) to build/train any of Section 7's other baselines
+the same way — see "Other baselines" below. (The "Educational-value only"
+baseline was removed: W01 in Section 8's 26-combination table already
+covers a pure edu-only weighted selection as part of the proxy CPT search,
+so a separate final-CPT baseline for it was redundant.)
 
 ## Part A — `build_final_cpt_dataset.py` (Section 11)
 
@@ -23,9 +30,9 @@ Structurally almost identical to `select_weighted_corpus.py` (Section 7),
 and deliberately so: this step reuses the exact same ranking algorithm,
 just with two differences reflected in the refactor described below:
 
-- **One weight vector, not 16.** Loads `data/best_weight.json` (Section
+- **One weight vector, not 26.** Loads `data/best_weight.json` (Section
   10's output) instead of iterating `data/weight_combinations.json`.
-- **A much bigger token budget.** 12.5M tokens/language (50M total) instead
+- **A much bigger token budget.** 12.5M tokens/language (100M total) instead
   of the proxy's 2M/language — this is training the real final model, not
   a cheap proxy.
 
@@ -76,7 +83,7 @@ run (Section 9) and this final run:
    `apply_lora` (default `r=16`, `lora_alpha=32`, `lora_dropout=0.05`),
    and prints the trainable-parameter count as a sanity check that LoRA is
    actually only exposing a small adapter, not the full 1.5B model.
-2. Loads all 4 languages' `data/candidate_corpus/final_cpt_dataset/{lang}.jsonl`
+2. Loads all 8 languages' `data/candidate_corpus/final_cpt_dataset/{lang}.jsonl`
    (Part A's output) and combines them into one text list.
 3. Packs into `--seq-length`-token blocks (same `pack_texts` used by the
    proxy run) and trains for `--epochs` (default 1) with `AdamW` over only
@@ -90,15 +97,70 @@ run (Section 9) and this final run:
 python3 scripts/run_final_cpt.py --device cuda
 ```
 
+## Other baselines (Section 7)
+
+`sea_rater/selection.py` also implements the two baselines that don't
+reduce to a fixed weight vector:
+
+- **`random`**: `select_random` shuffles with a fixed seed and takes
+  documents in that order until the token budget is hit — no rater
+  involved at all.
+- **`clean_heuristic`**: `select_clean_heuristic` filters on
+  `language_score >= 0.90` (FineWeb2's langid confidence, standing in for
+  `langid_conf`), `repetition_score <= 0.10`, and `target_script_ratio >=
+  0.90` (standing in for pipeline.md's `script_integrity`) — no length
+  window, and no rater involved — all computed at corpus-build time by
+  `sea_rater/heuristics.py` (see `docs/05_build_candidate_corpus.md`), then
+  keeps passing documents in their original order. This is deliberately
+  the *only* place these heuristic fields are used to filter anything —
+  the candidate corpus itself (shared by every baseline) is only ever
+  hard-cleaned by the bad-word filter in `build_candidate_corpus.py`, so
+  this baseline is a fair "simple hard filtering" comparison against the
+  learned rater pipeline, not a re-clean of the same corpus everyone else
+  already trains on.
+
+  **Gotcha, verified**: `data/candidate_corpus/{vi,id,th,km}.jsonl` predate
+  `sea_rater/heuristics.py` and lack `repetition_score`/`target_script_ratio`
+  entirely, so `clean_heuristic` silently selects **0 documents** for those
+  4 languages today (every doc fails the filter via `.get()` returning
+  `None`) — confirmed by actually running
+  `build_final_cpt_dataset.py --baseline clean_heuristic --languages vi`.
+  `build_final_cpt_dataset.py` now warns loudly when this happens; the real
+  fix is rerunning `build_candidate_corpus.py` for those languages to
+  backfill the fields.
+- **`equal_average`**: just `select_for_weight` with the fixed
+  `EQUAL_AVERAGE_WEIGHTS` vector — the same vector as proxy combo W06,
+  just applied at the final 12.5M-tokens/language scale instead of the
+  proxy's 2M.
+
+`sea_rater/baselines.py` maps each baseline name to its own dataset
+directory (`data/candidate_corpus/final_cpt_dataset_<baseline>/`) and
+adapter directory (`models/qwen1.5b_cpt_<baseline>/`), except
+`best_weighted` which keeps the original unsuffixed paths. Run any of them
+with:
+
+```bash
+python3 scripts/build_final_cpt_dataset.py --baseline random
+python3 scripts/run_final_cpt.py --baseline random --device cuda
+```
+
+`run_train_rater.sh` and `scripts/run_final_cpt.sh` have a commented-out
+build+train pair for each baseline — uncomment the pair you want to add to
+the comparison, then add its name to `evaluate_models.py --baselines`.
+
 ## What's actually been tested
 
-Nothing in this file could be run end-to-end here — no GPU, no
-`torch`/`transformers`/`peft` on this dev server, and no real
-`data/best_weight.json` yet (the proxy CPT run that produces it hasn't
-been executed on the cluster). `build_final_cpt_dataset.py`'s *selection
-logic* is the same code already validated via `select_weighted_corpus.py`'s
-synthetic-fixture test; `run_final_cpt.py`'s LoRA/training code is
-syntax-checked only (`py_compile`), not run.
+`run_final_cpt.py`'s LoRA/training code needs `torch`/`transformers`/`peft`,
+none of which are on this dev server, so that part is syntax-checked only
+(`py_compile`), not run. `build_final_cpt_dataset.py`, however, is pure
+CPU/data-processing and has real evidence behind it from two sources:
+a real cluster job (`job-2476.out`) ran `--baseline best_weighted` against
+the real vi candidate/scored corpus and `data/best_weight.json`'s W10 pick,
+selecting 9,926 vi documents totaling the requested 12.5M estimated tokens;
+separately, this dev server has a local venv with `datatrove`/`tqdm`
+installed (not part of `requirements.txt`, just for testing) that was used
+to actually run `--baseline clean_heuristic` here and confirm the
+0-selected-docs gotcha documented above.
 
 ## Re-running
 

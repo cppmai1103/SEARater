@@ -19,6 +19,7 @@ import numpy as np
 import torch
 from scipy.stats import spearmanr
 from torch.utils.data import DataLoader, TensorDataset
+from tqdm.auto import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sea_rater.rater import DIMENSIONS, QualityRaterHeads, huber_multi_loss
@@ -102,6 +103,7 @@ def evaluate(model, bundle, device):
 
 def train(args):
     device = args.device
+    print("loading cached embeddings for train/dev/test ...")
     train_bundle = load_embeddings("train")
     dev_bundle = load_embeddings("dev")
     test_bundle = load_embeddings("test")
@@ -116,10 +118,12 @@ def train(args):
     best_state = None
     epochs_without_improvement = 0
 
-    for epoch in range(1, args.epochs + 1):
+    print(f"training for up to {args.epochs} epoch(s) (patience {args.patience}) ...")
+    epoch_progress = tqdm(range(1, args.epochs + 1), desc="epochs", unit="epoch")
+    for epoch in epoch_progress:
         model.train()
         epoch_loss = 0.0
-        for batch in train_loader:
+        for batch in tqdm(train_loader, desc=f"epoch {epoch} train", unit="batch", leave=False):
             embeddings, targets = unpack_batch(batch, device)
             optimizer.zero_grad()
             preds = model(embeddings)
@@ -131,7 +135,8 @@ def train(args):
 
         dev_metrics = evaluate(model, dev_bundle, device)
         macro_spearman = dev_metrics["macro_average_spearman"]
-        print(
+        epoch_progress.set_postfix(train_loss=f"{epoch_loss:.4f}", dev_macro_spearman=f"{macro_spearman:.4f}")
+        tqdm.write(
             f"epoch {epoch:3d} | train_loss {epoch_loss:.4f} "
             f"| dev_macro_spearman {macro_spearman:.4f}"
         )
@@ -143,7 +148,7 @@ def train(args):
         else:
             epochs_without_improvement += 1
             if epochs_without_improvement >= args.patience:
-                print(f"early stopping at epoch {epoch} (best dev macro spearman {best_macro_spearman:.4f})")
+                tqdm.write(f"early stopping at epoch {epoch} (best dev macro spearman {best_macro_spearman:.4f})")
                 break
 
     model.load_state_dict(best_state)
@@ -154,6 +159,7 @@ def train(args):
         MODELS_DIR / "rater_heads.pt",
     )
 
+    print("evaluating on test set ...")
     test_metrics = evaluate(model, test_bundle, device)
     report_path = MODELS_DIR / "rater_test_report.json"
     report_path.write_text(json.dumps(test_metrics, indent=2, ensure_ascii=False))

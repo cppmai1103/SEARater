@@ -3,14 +3,15 @@
 Code: [`sea_rater/encoder.py`](../sea_rater/encoder.py),
 [`sea_rater/rater.py`](../sea_rater/rater.py),
 [`scripts/embed_splits.py`](../scripts/embed_splits.py),
-[`scripts/train_rater.py`](../scripts/train_rater.py)
+[`scripts/train_rater.py`](../scripts/train_rater.py),
+[`scripts/plot_rater_report.py`](../scripts/plot_rater_report.py)
 Pipeline reference: `pipeline.md` Section 4 ("Human-Only Quality Rater")
 
 ## Goal
 
 Train something that predicts the 5 quality dimensions
 (`educational_value`, `reasoning`, `professionalism`, `cleanliness`,
-`cultural_nuance`) for any document in any of the 4 pilot languages, using
+`cultural_nuance`) for any document in any of the 8 pilot languages, using
 only the 900-per-language human labels from Step 2.
 
 ## Why two scripts instead of one
@@ -127,43 +128,79 @@ seed 42. All overridable via flags.
 
 ## What an actual run produced
 
-The pilot has been run end-to-end once on the cluster (`sbatch
-scripts/run_train_rater.sh`, RTX A6000, `torch 2.6.0+cu124`). That run used
-`--epochs 1` (a smoke test, not a tuned result) and still reached:
+Two real cluster runs now exist. The first (`--epochs 1`, RTX A6000, only
+4 of the pilot's languages, before the 8-language expansion) was a smoke
+test and is superseded. The current `models/rater_heads.pt` /
+`models/rater_test_report.json` come from a full run (`sbatch
+run_train_rater.sh`, `torch 2.6.0+cu124`) with the actual `--epochs 50`
+default, early stopping never triggered before hitting 50 (`--patience 5`
+never saw 5 consecutive non-improving epochs), and all 8 languages:
 
 ```text
-macro_average_spearman:   0.611
-worst_language_spearman:  0.517   (Thai)
+macro_average_spearman:   0.788
+worst_language_spearman:  0.740   (Burmese)
 
 Per-language Spearman:
-              edu    reasoning  prof   clean  cultural
-  Indonesian  0.752  0.679      0.661  0.337  0.618
-  Khmer       0.828  0.802      0.513  0.681  0.848
-  Thai        0.679  0.685      0.464  0.209  0.551
-  Vietnamese  0.708  0.706      0.594  0.252  0.648
+              edu    reasoning  prof   clean  cultural   avg
+  Indonesian  0.808  0.859      0.704  0.719  0.817      0.781
+  Khmer       0.851  0.835      0.806  0.765  0.910      0.833
+  Lao         0.818  0.886      0.732  0.535  0.793      0.753
+  Malay       0.792  0.799      0.821  0.624  0.730      0.753
+  Burmese     0.720  0.737      0.755  0.684  0.804      0.740
+  Thai        0.839  0.833      0.817  0.837  0.826      0.831
+  Filipino    0.794  0.769      0.789  0.770  0.840      0.792
+  Vietnamese  0.852  0.865      0.826  0.739  0.819      0.820
 
-MAE by dimension: edu 0.99, reasoning 0.73, professionalism 0.61,
-                  cleanliness 1.37, cultural_nuance 1.23
+MAE by dimension: edu 0.51, reasoning 0.41, professionalism 0.34,
+                  cleanliness 0.80, cultural_nuance 0.62
 ```
 
-Takeaways from this smoke run (worth re-checking after a full, longer
-training run rather than treating as final):
-- `educational_value` and `reasoning` are the strongest, most consistent
-  dimensions across all 4 languages — matches Meta-rater's finding that
-  Educational Value and Reasoning are its two highest-weighted raters.
-- `cleanliness` is the weakest and most language-inconsistent dimension
-  (Spearman 0.21–0.68), especially poor for Thai — consistent with
-  cleanliness being described in the SEA-Rater proposal as harder to judge
-  cross-lingually and lowest-priority among the kept dimensions.
-- Only 1 training epoch was run; since the heads are tiny and embeddings
-  are cached, running the full 50-epoch/early-stopping default (as the
-  script supports) costs little extra GPU time and should be done before
-  treating these numbers as pilot results.
+Takeaways from this full run, across all 8 languages:
+- 0.788 macro Spearman comfortably clears JQL's ~0.75 benchmark mentioned
+  in the project proposal, despite covering 4 more (and generally
+  lower-resource) languages than that comparison point.
+- `reasoning` and `educational_value` are again the strongest, most
+  consistent dimensions — same pattern as the earlier smoke test, and
+  matches Meta-rater's finding that Educational Value and Reasoning are
+  its two highest-weighted raters.
+- `cleanliness` is still the weakest dimension by MAE (0.80, vs 0.34-0.62
+  for the others) and the most language-inconsistent by Spearman
+  (0.535-0.837) — consistent with cleanliness being described in the
+  SEA-Rater proposal as harder to judge cross-lingually and
+  lowest-priority among the kept dimensions. Notably it's no longer
+  uniformly weak: Thai's cleanliness Spearman (0.837) is now its
+  *strongest* dimension, while Lao's (0.535) is its weakest — the
+  difficulty seems language-specific rather than a property of the
+  dimension itself.
+- Burmese is the new worst-performing language (0.740 average) but still
+  well above the old smoke test's worst case (Thai at 0.517) — no
+  language is dragging the macro average down badly.
+
+## `scripts/plot_rater_report.py`
+
+A companion visualization script, not wired into `run_train_rater.sh` —
+run manually against `train_rater.py`'s JSON report:
+
+```bash
+python3 scripts/plot_rater_report.py
+# or against a specific report/output location:
+python3 scripts/plot_rater_report.py --report models/rater_test_report.json --output-dir models/figures
+```
+
+Produces 3 PNGs in `models/figures/`:
+- `spearman_heatmap.png`: language x dimension grid, colored by Spearman
+  correlation, titled with the macro-average and worst-language numbers.
+- `mae_by_dimension.png`: bar chart of `mae_by_dimension`.
+- `score_distributions.png`: one grouped bar chart per dimension, comparing
+  each language's 0–5 score histogram.
+
+Pure matplotlib/numpy over the already-written JSON report — no GPU, no
+torch, safe to run on the dev server once `rater_test_report.json` exists.
 
 ## Re-running
 
 ```bash
-sbatch scripts/run_train_rater.sh
+sbatch run_train_rater.sh
 ```
 
 Outputs land in `models/rater_heads.pt` (checkpoint) and

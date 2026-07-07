@@ -6,8 +6,9 @@ embeds each document with the frozen multilingual-e5-large encoder, and scores
 it with the trained rater heads (models/rater_heads.pt) to produce
 scored_corpus.jsonl per language with the 5 predicted quality dimensions.
 
-This is GPU-bound (an encoder forward pass over up to 1M documents total) and
-should be run on the cluster (see run_score_corpus.sh), not on the dev server.
+This is GPU-bound (an encoder forward pass over up to 800K documents total)
+and should be run on the cluster (see run_train_rater.sh), not on the dev
+server.
 
 Usage:
     python3 scripts/score_candidate_corpus.py --device cuda
@@ -20,17 +21,17 @@ import sys
 from pathlib import Path
 
 import torch
+from tqdm.auto import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sea_rater.encoder import DEFAULT_MAX_LENGTH, DEFAULT_MODEL_NAME, embed_texts, load_encoder
+from sea_rater.languages import LANGUAGES
 from sea_rater.rater import DIMENSIONS, QualityRaterHeads
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CORPUS_DIR = REPO_ROOT / "data" / "candidate_corpus"
 DEFAULT_OUTPUT_DIR = CORPUS_DIR / "scored"
 DEFAULT_RATER_CHECKPOINT = REPO_ROOT / "models" / "rater_heads.pt"
-
-LANGUAGES = ["vi", "id", "th", "km"]
 
 
 def load_rater(checkpoint_path, device):
@@ -51,7 +52,8 @@ def load_corpus(lang):
 @torch.no_grad()
 def score_embeddings(model, embeddings, device, batch_size=256):
     scores = {dim: [] for dim in DIMENSIONS}
-    for start in range(0, embeddings.shape[0], batch_size):
+    starts = range(0, embeddings.shape[0], batch_size)
+    for start in tqdm(starts, desc="scoring", unit="batch"):
         batch = embeddings[start : start + batch_size].to(device)
         out = model(batch)
         for dim in DIMENSIONS:
@@ -73,10 +75,13 @@ def main():
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    print(f"loading encoder {args.model_name} ...")
     tokenizer, encoder = load_encoder(args.model_name, device=args.device)
+    print(f"loading rater heads from {args.rater_checkpoint} ...")
     rater = load_rater(args.rater_checkpoint, args.device)
 
     for lang in args.languages:
+        print(f"\n=== [{lang}] scoring candidate corpus ===")
         rows = load_corpus(lang)
         texts = [row["text"] for row in rows]
 

@@ -11,8 +11,8 @@ that the rater-training step consumes.
 
 ## Input data
 
-Each of `data/{vie_Latn,ind_Latn,tha_Thai,khm_Khmr}.csv` has 940 rows with
-these columns:
+Each of `data/human_annotation/{vie_Latn,ind_Latn,tha_Thai,khm_Khmr,zsm_Latn,fil_Latn,mya_Mymr,lao_Laoo}.csv`
+has 940 rows with these columns:
 
 ```text
 text, char_len, language_score, source, len_bucket, lang_bucket,
@@ -27,7 +27,7 @@ range in the raw data, e.g. `professionalism` is only ever 1–4).
 
 Two things, exactly as requested:
 
-1. **Language** — each of the 4 pilot languages is split independently
+1. **Language** — each of the 8 pilot languages is split independently
    with the same fixed target sizes, so language balance is exact by
    construction (no stratification needed for this one).
 2. **Score distribution of all 5 dimensions** — the 0–5 histogram of
@@ -48,12 +48,24 @@ combination of all 5 to be populated.
 ### 1. Configuration constants
 
 ```python
-LANGUAGE_FILES = {"vi": "vie_Latn.csv", "id": "ind_Latn.csv",
-                   "th": "tha_Thai.csv", "km": "khm_Khmr.csv"}
+LANGUAGE_FILES = {code: f"human_annotation/{hf_config}.csv"
+                   for code, hf_config in LANGUAGE_HF_CONFIGS.items()}
+# {"vi": "human_annotation/vie_Latn.csv", "id": "human_annotation/ind_Latn.csv",
+#  "th": "human_annotation/tha_Thai.csv", "km": "human_annotation/khm_Khmr.csv",
+#  "ms": "human_annotation/zsm_Latn.csv", "tl": "human_annotation/fil_Latn.csv",
+#  "my": "human_annotation/mya_Mymr.csv", "lo": "human_annotation/lao_Laoo.csv"}
 DIMENSIONS = [... 5 dimension column names ...]
 SPLIT_SIZES = {"train": 720, "dev": 90, "test": 90, "drop": 40}
 SEED = 42
 ```
+
+Derived from the shared `LANGUAGE_HF_CONFIGS` (`sea_rater/languages.py`)
+rather than hardcoded, since every script that loops per-language now
+imports the same 8-language list from there. Note the filenames have no
+leading `/` — `Path("data") / "/human_annotation/x.csv"` would silently
+resolve to the absolute path `/human_annotation/x.csv` instead of
+`data/human_annotation/x.csv` (a real bug an earlier version of this dict
+had, caught while extending it to 8 languages).
 
 `SPLIT_SIZES` sums to exactly 940 — the full row count per language file.
 Folding the "keep 900 of 940" downsampling into the split itself (as a 4th
@@ -118,38 +130,38 @@ just one), so an imbalance in any dimension is visible immediately.
 
 For each language: load its 940 rows, run
 `iterative_stratified_split(..., SPLIT_SIZES, rng)`, keep the `train`/
-`dev`/`test` buckets and discard `drop`. Accumulate across the 4
+`dev`/`test` buckets and discard `drop`. Accumulate across the 8
 languages, shuffle each combined split once more, and write
 `data/splits/human_{train,dev,test}.jsonl`.
 
 ## What an actual run produced
 
 ```text
-human_train.jsonl: 2880 docs (720/language)
-  educational_value: {0: 442, 1: 1021, 2: 621, 3: 545, 4: 234, 5: 17}
-  reasoning:         {0: 595, 1: 1157, 2: 824, 3: 287, 4: 17}
-  professionalism:   {1: 970, 2: 1404, 3: 429, 4: 76, 5: 1}
-  cleanliness:       {0: 126, 1: 432, 2: 483, 3: 457, 4: 495, 5: 887}
-  cultural_nuances:  {0: 206, 1: 356, 2: 473, 3: 716, 4: 683, 5: 446}
+human_train.jsonl: 5760 docs (720/language x 8 languages)
+  educational_value: {0: 733, 1: 1978, 2: 1463, 3: 1149, 4: 407, 5: 30}
+  reasoning:         {0: 968, 1: 2336, 2: 1852, 3: 572, 4: 32}
+  professionalism:   {1: 1897, 2: 2879, 3: 866, 4: 117, 5: 1}
+  cleanliness:       {0: 196, 1: 777, 2: 948, 3: 886, 4: 1003, 5: 1950}
+  cultural_nuances:  {0: 281, 1: 843, 2: 804, 3: 1307, 4: 1482, 5: 1043}
 
-human_dev.jsonl: 360 docs (90/language)
-  educational_value: {0: 56, 1: 127, 2: 76, 3: 69, 4: 30, 5: 2}
-  reasoning:         {0: 76, 1: 142, 2: 104, 3: 35, 4: 3}
-  professionalism:   {1: 123, 2: 173, 3: 54, 4: 10}
-  cleanliness:       {0: 16, 1: 56, 2: 61, 3: 57, 4: 61, 5: 109}
-  cultural_nuances:  {0: 26, 1: 44, 2: 60, 3: 89, 4: 85, 5: 56}
+human_dev.jsonl: 720 docs (90/language x 8 languages)
+  educational_value: {0: 93, 1: 246, 2: 187, 3: 140, 4: 51, 5: 3}
+  reasoning:         {0: 122, 1: 292, 2: 231, 3: 71, 4: 4}
+  professionalism:   {1: 240, 2: 358, 3: 108, 4: 14}
+  cleanliness:       {0: 26, 1: 99, 2: 119, 3: 111, 4: 125, 5: 240}
+  cultural_nuances:  {0: 35, 1: 101, 2: 102, 3: 166, 4: 185, 5: 131}
 
-human_test.jsonl: 360 docs (90/language)
-  educational_value: {0: 52, 1: 129, 2: 79, 3: 68, 4: 30, 5: 2}
-  reasoning:         {0: 72, 1: 147, 2: 103, 3: 36, 4: 2}
-  professionalism:   {1: 122, 2: 174, 3: 54, 4: 10}
-  cleanliness:       {0: 17, 1: 51, 2: 64, 3: 58, 4: 61, 5: 109}
-  cultural_nuances:  {0: 20, 1: 45, 2: 58, 3: 91, 4: 91, 5: 55}
+human_test.jsonl: 720 docs (90/language x 8 languages)
+  educational_value: {0: 89, 1: 249, 2: 181, 3: 145, 4: 52, 5: 4}
+  reasoning:         {0: 117, 1: 299, 2: 229, 3: 71, 4: 4}
+  professionalism:   {1: 237, 2: 358, 3: 110, 4: 15}
+  cleanliness:       {0: 25, 1: 95, 2: 122, 3: 112, 4: 125, 5: 241}
+  cultural_nuances:  {0: 29, 1: 105, 2: 100, 3: 165, 4: 192, 5: 129}
 ```
 
 Every dimension now lands close to the exact 80/10/10 split ratio at every
-score level — e.g. `cleanliness=5`: 887/109/109; `professionalism=4`:
-76/10/10; `reasoning=4`: 17/3/2 — and language stays exactly 720/90/90 per
+score level — e.g. `cleanliness=5`: 1950/240/241; `professionalism=4`:
+117/14/15; `reasoning=4`: 32/4/4 — and language stays exactly 720/90/90 per
 language, as before.
 
 ## Re-running

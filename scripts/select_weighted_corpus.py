@@ -1,7 +1,7 @@
 """
 pipeline.md Section 7 - Main method: Best weighted combination.
 
-For each of the 16 weight combinations (Section 8, data/weight_combinations.json)
+For each of the 26 weight combinations (Section 8, data/weight_combinations.json)
 and each language, computes a weighted aggregate score per scored candidate
 document:
 
@@ -27,13 +27,15 @@ import json
 import sys
 from pathlib import Path
 
+from tqdm.auto import tqdm
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from sea_rater.languages import LANGUAGES
 from sea_rater.selection import CORPUS_DIR, join_scores_with_text, select_for_weight
 
 DEFAULT_WEIGHTS_PATH = Path(__file__).resolve().parent.parent / "data" / "weight_combinations.json"
 DEFAULT_OUTPUT_DIR = CORPUS_DIR / "selected"
 
-LANGUAGES = ["vi", "id", "th", "km"]
 DEFAULT_TOKENS_PER_LANGUAGE = 2_000_000  # pipeline.md Section 9 proxy data size
 
 
@@ -63,7 +65,7 @@ def main():
         joined_by_lang[lang] = join_scores_with_text(lang)
         print(f"[{lang}] {len(joined_by_lang[lang])} scored docs available")
 
-    for combo in combos:
+    for combo in tqdm(combos, desc="weight combinations", unit="combo"):
         weight_id, weights = combo["id"], combo["weights"]
         out_dir = args.output_dir / weight_id
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -87,7 +89,7 @@ def main():
                     }
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-            print(
+            tqdm.write(
                 f"[{weight_id}][{lang}] selected {len(selected)} docs, "
                 f"~{total_tokens / 1e6:.2f}M est. tokens "
                 f"(target {args.tokens_per_language / 1e6:.2f}M) -> {out_path}"
