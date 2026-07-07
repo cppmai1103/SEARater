@@ -1,0 +1,10 @@
+torch
+transformers
+accelerate
+scikit-learn
+scipy
+numpy
+pandas
+tqdm
+matplotlib
+datatrove[io]

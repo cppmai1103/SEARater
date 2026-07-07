@@ -1,0 +1,7 @@
+/data
+CLAUDE.md
+/.scratch
+/models
+__pycache__/
+*.pyc
+*.sh
