@@ -3,13 +3,7 @@
 import torch
 import torch.nn as nn
 
-DIMENSIONS = [
-    "educational_value",
-    "reasoning",
-    "professionalism",
-    "cleanliness",
-    "cultural_nuance",
-]
+from sea_rater.dimensions import DIMENSIONS
 
 
 def _make_head(input_dim, hidden_dim):

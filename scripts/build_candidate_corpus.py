@@ -11,7 +11,7 @@ unimplemented for this pilot; Section 5 only asks for
 doc_id/language/text/source).
 
 Usage:
-    python3 scripts/build_candidate_corpus.py --pool-size 250000
+    python3 scripts/build_candidate_corpus.py --pool-size 100000
     python3 scripts/build_candidate_corpus.py --languages vi --pool-size 1000  # quick test
 """
 
@@ -87,7 +87,7 @@ def main():
     parser.add_argument(
         "--languages", nargs="+", default=list(LANGUAGE_HF_CONFIGS), choices=list(LANGUAGE_HF_CONFIGS)
     )
-    parser.add_argument("--pool-size", type=int, default=250_000)
+    parser.add_argument("--pool-size", type=int, default=100_000)
     parser.add_argument("--clean-ratio", type=float, default=0.8)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     args = parser.parse_args()

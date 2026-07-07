@@ -508,7 +508,7 @@ For 4 languages:
 ### Proxy runs
 
 ```text
-16 weight combinations × 50M tokens each
+16 weight combinations × 8M tokens each
 ```
 
 Each run starts from the same checkpoint:
@@ -517,8 +517,17 @@ Each run starts from the same checkpoint:
 Qwen2.5-0.5B Base
 ```
 
-### Control variables
-
+### Steps 
+1. Select proxy training data for each combination
+- For each weight combination:
+    + Compute selection_score for every document
+    + Rank documents within each language
+    + Select the top documents until you reach the token budget.
+- Ex: Top 2M Vietnamese tokens by W01 score, ...
+2. Continue-pretrain the proxy model
+- For each selected proxy dataset, start from the same pretrained checkpoint
+- Each run must start from the same base model so the comparison is fair.
+Note: For every proxy run, keep all training settings fixed. The only thing that changes is the selected data. 
 Keep the same across all proxy runs:
 
 - Base checkpoint
@@ -535,7 +544,7 @@ Only change:
 ```text
 Data selected by the weight combination
 ```
-
+3. Validate every proxy model 
 ### Validation set
 
 Create a fixed held-out validation set:
@@ -551,6 +560,9 @@ For 4 languages:
 ```
 
 This validation set must not overlap with candidate training data.
+- After each proxy run, evaluate on the same fixed validation set of each language
+- The validation set is never used for training.
+- For each proxy model, compute language modeling loss:
 
 ### Proxy metrics
 
@@ -568,13 +580,13 @@ worst_language_validation_loss
 Main proxy selection metric:
 
 ```text
-macro_validation_loss
+macro_loss = mean(loss_vi, loss_id, loss_th, loss_km)
 ```
 
 Tie-breaker:
 
 ```text
-worst_language_validation_loss
+worst_language_loss = max(loss_vi, loss_id, loss_th, loss_km)
 ```
 
 ### Output
@@ -656,8 +668,8 @@ Build 2 final CPT datasets:
 Each dataset has exactly:
 
 ```text
-250M tokens total
-62.5M tokens per language
+50M tokens total
+12.5M tokens per language
 ```
 
 <!-- ### Output -->
@@ -707,8 +719,8 @@ Train a model: Qwen2.5-1.5B-CPT-BestWeighted with LoRa
 Keep the same across all final CPT runs:
 
 - Base checkpoint
-- Token budget: 250M tokens
-- Language balance: 62.5M tokens/language
+- Token budget: 50M tokens
+- Language balance: 12.5M tokens/language
 - Sequence length
 - Batch size
 - Learning rate schedule
@@ -746,8 +758,8 @@ Qwen2.5-1.5B-CPT-BestWeighted
 Use the fixed validation set:
 
 ```text
-10M tokens per language
-40M tokens total
+1M tokens per language
+4M tokens total
 ```
 
 Report:
