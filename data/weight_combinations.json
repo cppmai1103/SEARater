@@ -1,0 +1,178 @@
+[
+  {
+    "id": "W01",
+    "meaning": "Edu only",
+    "weights": {
+      "educational_value": 1.0,
+      "reasoning": 0.0,
+      "professionalism": 0.0,
+      "cleanliness": 0.0,
+      "cultural_nuance": 0.0
+    }
+  },
+  {
+    "id": "W02",
+    "meaning": "Reasoning only",
+    "weights": {
+      "educational_value": 0.0,
+      "reasoning": 1.0,
+      "professionalism": 0.0,
+      "cleanliness": 0.0,
+      "cultural_nuance": 0.0
+    }
+  },
+  {
+    "id": "W03",
+    "meaning": "Professionalism only",
+    "weights": {
+      "educational_value": 0.0,
+      "reasoning": 0.0,
+      "professionalism": 1.0,
+      "cleanliness": 0.0,
+      "cultural_nuance": 0.0
+    }
+  },
+  {
+    "id": "W04",
+    "meaning": "Cleanliness only",
+    "weights": {
+      "educational_value": 0.0,
+      "reasoning": 0.0,
+      "professionalism": 0.0,
+      "cleanliness": 1.0,
+      "cultural_nuance": 0.0
+    }
+  },
+  {
+    "id": "W05",
+    "meaning": "Cultural only",
+    "weights": {
+      "educational_value": 0.0,
+      "reasoning": 0.0,
+      "professionalism": 0.0,
+      "cleanliness": 0.0,
+      "cultural_nuance": 1.0
+    }
+  },
+  {
+    "id": "W06",
+    "meaning": "Equal average",
+    "weights": {
+      "educational_value": 0.2,
+      "reasoning": 0.2,
+      "professionalism": 0.2,
+      "cleanliness": 0.2,
+      "cultural_nuance": 0.2
+    }
+  },
+  {
+    "id": "W07",
+    "meaning": "Edu-heavy",
+    "weights": {
+      "educational_value": 0.4,
+      "reasoning": 0.2,
+      "professionalism": 0.2,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W08",
+    "meaning": "Reasoning-heavy",
+    "weights": {
+      "educational_value": 0.25,
+      "reasoning": 0.35,
+      "professionalism": 0.2,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W09",
+    "meaning": "Professionalism-heavy",
+    "weights": {
+      "educational_value": 0.25,
+      "reasoning": 0.15,
+      "professionalism": 0.35,
+      "cleanliness": 0.15,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W10",
+    "meaning": "Cleanliness-heavy",
+    "weights": {
+      "educational_value": 0.25,
+      "reasoning": 0.1,
+      "professionalism": 0.1,
+      "cleanliness": 0.4,
+      "cultural_nuance": 0.15
+    }
+  },
+  {
+    "id": "W11",
+    "meaning": "Cultural-heavy",
+    "weights": {
+      "educational_value": 0.25,
+      "reasoning": 0.1,
+      "professionalism": 0.1,
+      "cleanliness": 0.15,
+      "cultural_nuance": 0.4
+    }
+  },
+  {
+    "id": "W12",
+    "meaning": "Edu + reasoning",
+    "weights": {
+      "educational_value": 0.35,
+      "reasoning": 0.3,
+      "professionalism": 0.2,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.05
+    }
+  },
+  {
+    "id": "W13",
+    "meaning": "Edu + professionalism",
+    "weights": {
+      "educational_value": 0.35,
+      "reasoning": 0.1,
+      "professionalism": 0.3,
+      "cleanliness": 0.15,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W14",
+    "meaning": "Edu + cleanliness",
+    "weights": {
+      "educational_value": 0.3,
+      "reasoning": 0.15,
+      "professionalism": 0.15,
+      "cleanliness": 0.3,
+      "cultural_nuance": 0.1
+    }
+  },
+  {
+    "id": "W15",
+    "meaning": "Edu + cultural",
+    "weights": {
+      "educational_value": 0.3,
+      "reasoning": 0.15,
+      "professionalism": 0.15,
+      "cleanliness": 0.1,
+      "cultural_nuance": 0.3
+    }
+  },
+  {
+    "id": "W16",
+    "meaning": "Reasoning + professionalism",
+    "weights": {
+      "educational_value": 0.2,
+      "reasoning": 0.3,
+      "professionalism": 0.25,
+      "cleanliness": 0.15,
+      "cultural_nuance": 0.1
+    }
+  }
+]
