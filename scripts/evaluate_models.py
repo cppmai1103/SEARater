@@ -205,9 +205,18 @@ def run_downstream_eval(args):
     args.lm_eval_output_dir.mkdir(parents=True, exist_ok=True)
 
     print("[base] running lm_eval ...")
-    base_raw = run_lm_eval(
-        f"pretrained={args.model_name}", args.lm_eval_output_dir / "base", args.tasks, args.device
-    ).get("results", {})
+    try:
+        base_raw = run_lm_eval(
+            f"pretrained={args.model_name}", args.lm_eval_output_dir / "base", args.tasks, args.device
+        ).get("results", {})
+    except subprocess.CalledProcessError as e:
+        tqdm.write(
+            f"[base] lm_eval failed ({e}) -- skipping downstream eval entirely. This usually "
+            f"means one of --tasks isn't registered under this lm-eval version's exact name; "
+            f"run `lm_eval --tasks list | grep -i sib200` (and `| grep -i belebele`) on the "
+            f"cluster and fix SIB200_TASKS_BY_LANGUAGE / --tasks to match."
+        )
+        return {}
     results = {"base": base_raw}
     sib200_base = summarize_sib200(base_raw)
     if sib200_base:
@@ -223,12 +232,16 @@ def run_downstream_eval(args):
             tqdm.write(f"[{baseline}] no trained adapter at {adapter_dir}, skipping")
             continue
         tqdm.write(f"[{baseline}] running lm_eval ...")
-        cpt_raw = run_lm_eval(
-            f"pretrained={args.model_name},peft={adapter_dir}",
-            args.lm_eval_output_dir / baseline,
-            args.tasks,
-            args.device,
-        ).get("results", {})
+        try:
+            cpt_raw = run_lm_eval(
+                f"pretrained={args.model_name},peft={adapter_dir}",
+                args.lm_eval_output_dir / baseline,
+                args.tasks,
+                args.device,
+            ).get("results", {})
+        except subprocess.CalledProcessError as e:
+            tqdm.write(f"[{baseline}] lm_eval failed ({e}) -- skipping this baseline's downstream eval")
+            continue
         results[baseline] = cpt_raw
         sib200_cpt = summarize_sib200(cpt_raw)
         if sib200_cpt:
@@ -259,14 +272,19 @@ def main():
     args = parser.parse_args()
 
     results = {"held_out_lm_eval": run_held_out_eval(args)}
+    # Write immediately after 13.1 -- 13.2 shells out to a separate `lm_eval` process
+    # per model/baseline and can fail on a task-name mismatch; if results were only
+    # written once at the end, a 13.2 failure would silently discard 13.1's numbers
+    # even though they'd already been fully computed.
+    args.output_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    print(f"\nWrote evaluation results -> {args.output_path}")
 
     if not args.skip_downstream:
         results["downstream_eval"] = run_downstream_eval(args)
+        args.output_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+        print(f"\nWrote evaluation results -> {args.output_path}")
     else:
         print("\n(skipping 13.2 downstream evaluation, --skip-downstream set)")
-
-    args.output_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(f"\nWrote evaluation results -> {args.output_path}")
 
 
 if __name__ == "__main__":
