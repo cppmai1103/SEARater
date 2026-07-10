@@ -8,4 +8,5 @@ tqdm
 matplotlib
 datatrove[io]
 peft
-lm-eval
+datasets
+huggingface_hub

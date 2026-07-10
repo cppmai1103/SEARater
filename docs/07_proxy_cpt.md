@@ -21,12 +21,9 @@ Run in this order (also chained in `run_proxy_cpt.sh`):
 1. **`build_validation_set.py`** — build the one fixed validation set every
    proxy run (and later the final run) will be judged against.
 2. **`run_proxy_cpt.py`** (Section 9) — 26 independent continue-pretraining
-   runs, one per weight combination, each evaluated on that validation set
-   (W01-W16 have real results in `data/proxy_results.csv`, but those rows
-   are now stale on three counts: computed for 4 languages instead of 8,
-   computed with full fine-tuning instead of LoRA -- see Part C -- and
-   W17-W26 don't exist yet. All 26 need a fresh run against the rebuilt
-   8-language validation set with the current LoRA training code).
+   runs, one per weight combination, each evaluated on that validation set.
+   All 26 have real results in `data/proxy_results.csv`, computed for the
+   full 8 languages with the current LoRA training code (see Part C).
 3. **`select_best_weight.py`** (Section 10) — pick the winner from all 26
    results.
 
@@ -144,23 +141,27 @@ python3 scripts/select_best_weight.py
 `select_best_weight.py` was fully validated locally with a synthetic
 16-row `proxy_results.csv` (random per-language losses, one combo forced
 into a 3-way tie for lowest `macro_loss`): it correctly identified the tie
-group and broke it by `worst_language_loss`. It's also been run for real
-against the actual (if now-stale, 4-language) `data/proxy_results.csv` —
-correctly picked W10 (Cleanliness-heavy) after finding a tie among a few
-close combos.
+group and broke it by `worst_language_loss`.
 
 `build_validation_set.py` and `run_proxy_cpt.py` have both completed real
-cluster runs too: `data/validation_set/{vi,id,th,km}.jsonl` and
-`data/candidate_corpus/selected/{W01..W16}/{vi,id,th,km}.jsonl` both exist
-with real content on disk, matching the 16 rows already in
-`data/proxy_results.csv`. That real run predates both the pilot's
-expansion to 8 languages *and* the switch to LoRA (it used full
-fine-tuning), so `data/proxy_results.csv`/`data/best_weight.json` need a
-full rerun with the current code — not just an extension to the 4 new
-languages and W17-W26 — before they reflect the current pipeline. `torch`/
-`transformers` aren't installed on this dev server, so none of this could
-be re-verified here directly — the evidence above comes from the real
-cluster job's output on disk, not a local rerun.
+cluster runs against the current pipeline: `data/validation_set/{lang}.jsonl`
+exists for all 8 languages, and `data/proxy_results.csv` has all 26 rows
+(`W01`-`W26`), each with a real `loss_{lang}` for all 8 languages, computed
+with the current LoRA training code (not the earlier 4-language/
+full-fine-tuning run this section used to describe). `select_best_weight.py`
+picked **`W11` (Cultural-heavy)** — recorded in `data/best_weight.json` —
+after finding a **16-way tie** among the 26 combos (all within the default
+1% tolerance of the lowest `macro_loss`, `W04`/Cleanliness-only) and
+breaking it by `worst_language_loss`. See
+[`../analysis/proxy_cpt_ranking.md`](../analysis/proxy_cpt_ranking.md) for
+the full ranked table and
+[`../analysis/README.md`](../analysis/README.md) for why that wide a tie
+at the proxy stage is worth keeping in mind when reading Section 13's
+final-eval results — `torch`/`transformers` aren't installed on this dev
+server, so none of this could be re-verified here directly, but
+`data/proxy_results.csv`/`data/best_weight.json` on disk are internally
+consistent with each other and with `analysis/proxy_cpt_ranking.py`
+recomputing the same winner from the same tie-break rule.
 
 ## Re-running
 

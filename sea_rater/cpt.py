@@ -103,10 +103,11 @@ def evaluate_loss(model, loader, device, desc="eval"):
     total_loss = 0.0
     total_batches = 0
     progress = tqdm(loader, desc=desc, unit="batch")
-    for (batch,) in progress:
-        batch = batch.to(device)
-        outputs = model(input_ids=batch, labels=batch)
-        total_loss += outputs.loss.item()
-        total_batches += 1
-        progress.set_postfix(loss=f"{total_loss / total_batches:.4f}")
+    with torch.no_grad():
+        for (batch,) in progress:
+            batch = batch.to(device)
+            outputs = model(input_ids=batch, labels=batch)
+            total_loss += outputs.loss.item()
+            total_batches += 1
+            progress.set_postfix(loss=f"{total_loss / total_batches:.4f}")
     return total_loss / max(total_batches, 1)

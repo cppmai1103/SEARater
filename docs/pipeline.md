@@ -786,9 +786,13 @@ Primary metric:
 Macro-average perplexity reduction
 ```
 
-### 13.2 SEA downstream evaluation: lm-evaluation-harness
+### 13.2 SEA downstream evaluation: 0-shot multiple-choice accuracy
 
-Use 2 available SEA/multilingual benchmarks for the pilot.
+Use 2 available SEA/multilingual benchmarks for the pilot, scored directly
+against each loaded model (no lm-evaluation-harness dependency -- sib200
+isn't a registered task in the installed harness version at all; see
+docs/09_evaluation.md for the full rationale and the log-likelihood scoring
+implementation).
 - topic classification: https://huggingface.co/datasets/Davlan/sib200
 - MCQ: https://huggingface.co/datasets/facebook/belebele
 

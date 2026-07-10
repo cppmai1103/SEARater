@@ -1,7 +1,11 @@
-/data
+data/
 CLAUDE.md
-/.scratch
-/models
+.scratch/
+models/
 __pycache__/
 *.pyc
 *.sh
+probing/
+*.out 
+*.err 
+models/
